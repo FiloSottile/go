@@ -93,8 +93,11 @@ func (c *Conn) serverHandshake() error {
 			return err
 		}
 	}
-	c.handshakeComplete = true
 
+	c.handshakeComplete = true
+	c.masterSecret = hs.masterSecret
+	c.serverRandom = hs.hello.random
+	c.clientRandom = hs.clientHello.random
 	return nil
 }
 

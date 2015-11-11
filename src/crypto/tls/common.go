@@ -174,6 +174,11 @@ type ConnectionState struct {
 	// future versions of Go once the TLS master-secret fix has been
 	// standardized and implemented.
 	TLSUnique []byte
+
+	// ClientRandom, ServerRandom and MasterSecret are low-level handshake
+	// values exposed to enable custom connection binding like in the Tor
+	// transport protocol.
+	ClientRandom, ServerRandom, MasterSecret []byte
 }
 
 // ClientAuthType declares the policy the server will follow for

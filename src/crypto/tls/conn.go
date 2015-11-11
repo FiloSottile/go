@@ -50,6 +50,8 @@ type Conn struct {
 	clientProtocol         string
 	clientProtocolFallback bool
 
+	clientRandom, serverRandom, masterSecret []byte
+
 	// input/output
 	in, out  halfConn     // in.Mutex < out.Mutex
 	rawInput *block       // raw input, right off the wire
@@ -999,6 +1001,9 @@ func (c *Conn) ConnectionState() ConnectionState {
 		if !c.didResume {
 			state.TLSUnique = c.firstFinished[:]
 		}
+		state.MasterSecret = c.masterSecret
+		state.ServerRandom = c.serverRandom
+		state.ClientRandom = c.clientRandom
 	}
 
 	return state
