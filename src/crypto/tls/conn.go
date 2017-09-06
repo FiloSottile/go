@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -398,6 +399,7 @@ func (hc *halfConn) encrypt(b *block, explicitIVLen int) (bool, alert) {
 	payload := b.data[recordHeaderLen:]
 
 	// encrypt
+	kTLS := false
 	if hc.cipher != nil {
 		switch c := hc.cipher.(type) {
 		case cipher.Stream:
@@ -428,16 +430,28 @@ func (hc *halfConn) encrypt(b *block, explicitIVLen int) (bool, alert) {
 			b.resize(recordHeaderLen + explicitIVLen + len(prefix) + len(finalBlock))
 			c.CryptBlocks(b.data[recordHeaderLen+explicitIVLen:], prefix)
 			c.CryptBlocks(b.data[recordHeaderLen+explicitIVLen+len(prefix):], finalBlock)
+		case kTLSCipher:
+			if recordType(b.data[0]) == recordTypeAlert {
+				log.Printf("kTLS: dropped alert on the floor")
+				b.data = b.data[:recordHeaderLen]
+			} else if recordType(b.data[0]) != recordTypeApplicationData {
+				panic("kTLS: tried to send unsupported data type")
+			}
+			b.data = b.data[recordHeaderLen:]
+			kTLS = true
+			log.Printf("kTLS: sent %d bytes of plaintext to the kernel", len(b.data))
 		default:
 			panic("unknown cipher type")
 		}
 	}
 
-	// update length to include MAC and any block padding needed.
-	n := len(b.data) - recordHeaderLen
-	b.data[3] = byte(n >> 8)
-	b.data[4] = byte(n)
-	hc.incSeq()
+	if !kTLS {
+		// update length to include MAC and any block padding needed.
+		n := len(b.data) - recordHeaderLen
+		b.data[3] = byte(n >> 8)
+		b.data[4] = byte(n)
+		hc.incSeq()
+	}
 
 	return true, 0
 }
@@ -808,6 +822,8 @@ func (c *Conn) maxPayloadSizeForWrite(typ recordType, explicitIVLen int) int {
 			// The MAC is appended before padding so affects the
 			// payload size directly.
 			payloadBytes -= macSize
+		case kTLSCipher:
+			payloadBytes -= kTLSOverhead
 		default:
 			panic("unknown cipher type")
 		}
@@ -1389,4 +1405,22 @@ func (c *Conn) VerifyHostname(host string) error {
 		return errors.New("tls: handshake did not verify certificate chain")
 	}
 	return c.peerCertificates[0].VerifyHostname(host)
+}
+
+func (c *Conn) enableApplicationDataEncryption() error {
+	if aead, ok := c.out.cipher.(*fixedNonceAEAD); ok && len(aead.key) == 16 {
+		if tcpConn, ok := c.conn.(*net.TCPConn); ok {
+			if err := kTLSEnable(tcpConn, aead.key, aead.nonce[:4], c.out.seq[:]); err != nil {
+				log.Println("kTLS: error enabling:", err)
+				return err
+			}
+			log.Println("kTLS: enabled")
+			c.out.cipher = kTLSCipher{}
+		} else {
+			log.Println("kTLS: unsupported connection type")
+		}
+	} else {
+		log.Println("kTLS: unsupported cipher suite")
+	}
+	return nil
 }

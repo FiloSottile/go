@@ -265,6 +265,10 @@ func (hs *clientHandshakeState) handshake() error {
 		}
 	}
 
+	if err := c.enableApplicationDataEncryption(); err != nil {
+		return err
+	}
+
 	c.didResume = isResume
 	c.handshakeComplete = true
 

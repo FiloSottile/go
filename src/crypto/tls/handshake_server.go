@@ -103,6 +103,9 @@ func (c *Conn) serverHandshake() error {
 			return err
 		}
 	}
+	if err := c.enableApplicationDataEncryption(); err != nil {
+		return err
+	}
 	c.handshakeComplete = true
 
 	return nil

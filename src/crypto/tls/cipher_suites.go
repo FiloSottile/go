@@ -163,6 +163,7 @@ type aead interface {
 type fixedNonceAEAD struct {
 	// nonce contains the fixed part of the nonce in the first four bytes.
 	nonce [12]byte
+	key   []byte
 	aead  cipher.AEAD
 }
 
@@ -225,7 +226,7 @@ func aeadAESGCM(key, fixedNonce []byte) cipher.AEAD {
 		panic(err)
 	}
 
-	ret := &fixedNonceAEAD{aead: aead}
+	ret := &fixedNonceAEAD{aead: aead, key: key}
 	copy(ret.nonce[:], fixedNonce)
 	return ret
 }
