@@ -197,24 +197,44 @@ func TestParseEncryptedPrivateKeysFails(t *testing.T) {
 func TestParseEncryptedPrivateKeysWithPassphrase(t *testing.T) {
 	data := []byte("sign me")
 	for _, tt := range testdata.PEMEncryptedKeys {
+		_, err := ParsePrivateKeyWithPassphrase(tt.PEMBytes, []byte("incorrect"))
+		if err != x509.IncorrectPasswordError {
+			t.Errorf("%s: got %v want IncorrectPasswordError", tt.Name, err)
+		}
+
 		s, err := ParsePrivateKeyWithPassphrase(tt.PEMBytes, []byte(tt.EncryptionKey))
 		if err != nil {
-			t.Fatalf("ParsePrivateKeyWithPassphrase returned error: %s", err)
+			t.Errorf("%s: ParsePrivateKeyWithPassphrase returned error: %s", tt.Name, err)
 			continue
 		}
+
 		sig, err := s.Sign(rand.Reader, data)
 		if err != nil {
-			t.Fatalf("dsa.Sign: %v", err)
+			t.Errorf("%s: Signer.Sign: %v", tt.Name, err)
+			continue
 		}
 		if err := s.PublicKey().Verify(data, sig); err != nil {
-			t.Errorf("Verify failed: %v", err)
+			t.Errorf("%s: Verify failed: %v", tt.Name, err)
 		}
-	}
 
-	tt := testdata.PEMEncryptedKeys[0]
-	_, err := ParsePrivateKeyWithPassphrase(tt.PEMBytes, []byte("incorrect"))
-	if err != x509.IncorrectPasswordError {
-		t.Fatalf("got %v want IncorrectPasswordError", err)
+		_, err = ParsePrivateKey(tt.PEMBytes)
+		if err == nil {
+			t.Errorf("%s: ParsePrivateKey succeeded, expected an error", tt.Name)
+			continue
+		}
+
+		if err, ok := err.(*PassphraseNeededError); !ok {
+			t.Errorf("%s: got error %q, want PassphraseNeededError", tt.Name, err)
+		} else if tt.IncludesPublicKey {
+			if err.PublicKey == nil {
+				t.Errorf("%s: expected PassphraseNeededError.PublicKey not to be nil", tt.Name)
+				continue
+			}
+			got, want := err.PublicKey.Marshal(), s.PublicKey().Marshal()
+			if !bytes.Equal(got, want) {
+				t.Errorf("%s: error field %q doesn't match signer public key %q", tt.Name, got, want)
+			}
+		}
 	}
 }
 

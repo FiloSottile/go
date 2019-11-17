@@ -164,9 +164,10 @@ var SSHCertificates = map[string][]byte{
 }
 
 var PEMEncryptedKeys = []struct {
-	Name          string
-	EncryptionKey string
-	PEMBytes      []byte
+	Name              string
+	EncryptionKey     string
+	IncludesPublicKey bool
+	PEMBytes          []byte
 }{
 	0: {
 		Name:          "rsa-encrypted",
@@ -222,6 +223,21 @@ R/4X3HWfIdOHsDUvJ8xVWZ4BZk9Zk9qol045DcFCehpr/3hslCrKSZHakLt9GI58
 vVQJ4L0aYp5nloLfzhViZtKJXRLkySMKdzYkIlNmW1oVGl7tce5UCNI8Nok4j6yn
 IiHM7GBn+0nJoKTXsOGMIBe3ulKlKVxLjEuk9yivh/8=
 -----END DSA PRIVATE KEY-----
+`),
+	},
+
+	2: {
+		Name:              "ed25519-encrypted",
+		EncryptionKey:     "password",
+		IncludesPublicKey: true,
+		PEMBytes: []byte(`-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABDKj29BlC
+ocEWuVhQ94/RjoAAAAEAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIIw1gSurPTDwZidA
+2AIjQZgoQi3IFn9jBtFdP10/Jj7DAAAAoFGkQbB2teSU7ikUsnc7ct2aH3pitM359lNVUh
+7DQbJWMjbQFbrBYyDJP+ALj1/RZmP2yoIf7/wr99q53/pm28Xp1gGP5V2RGRJYCA6kgFIH
+xdB6KEw1Ce7Bz8JaDIeagAGd3xtQTH3cuuleVxCZZnk9NspsPxigADKCls/RUiK7F+z3Qf
+Lvs9+PH8nIuhFMYZgo3liqZbVS5z4Fqhyzyq4=
+-----END OPENSSH PRIVATE KEY-----
 `),
 	},
 }
