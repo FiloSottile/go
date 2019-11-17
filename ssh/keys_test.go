@@ -180,7 +180,6 @@ func TestParseECPrivateKey(t *testing.T) {
 
 // See Issue https://github.com/golang/go/issues/6650.
 func TestParseEncryptedPrivateKeysFails(t *testing.T) {
-	const wantSubstring = "encrypted"
 	for i, tt := range testdata.PEMEncryptedKeys {
 		_, err := ParsePrivateKey(tt.PEMBytes)
 		if err == nil {
@@ -188,8 +187,8 @@ func TestParseEncryptedPrivateKeysFails(t *testing.T) {
 			continue
 		}
 
-		if !strings.Contains(err.Error(), wantSubstring) {
-			t.Errorf("#%d key %s: got error %q, want substring %q", i, tt.Name, err, wantSubstring)
+		if _, ok := err.(*PassphraseNeededError); !ok {
+			t.Errorf("#%d key %s: got error %q, want PassphraseNeededError", i, tt.Name, err)
 		}
 	}
 }
