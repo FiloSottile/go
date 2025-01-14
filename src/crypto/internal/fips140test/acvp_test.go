@@ -121,6 +121,8 @@ var (
 	//   https://pages.nist.gov/ACVP/draft-celi-acvp-symmetric.html#section-7.3
 	// HKDF KDA algorithm capabilities:
 	//   https://pages.nist.gov/ACVP/draft-hammett-acvp-kas-kdf-hkdf.html#section-7.3
+	// OneStepNoCounter KDA algorithm capabilities:
+	//   https://pages.nist.gov/ACVP/draft-hammett-acvp-kas-kdf-onestepnocounter.html#section-7.2
 	// TLS 1.2 KDF algorithm capabilities:
 	//   https://pages.nist.gov/ACVP/draft-celi-acvp-kdf-tls.html#section-7.2
 	// TLS 1.3 KDF algorithm capabilities:
@@ -290,6 +292,17 @@ var (
 
 		"KDF-counter":  cmdKdfCounterAft(),
 		"KDF-feedback": cmdKdfFeedbackAft(),
+
+		"OneStepNoCounter/HMAC-SHA2-224":     cmdOneStepNoCounterHmacAft(func() fips140.Hash { return sha256.New224() }),
+		"OneStepNoCounter/HMAC-SHA2-256":     cmdOneStepNoCounterHmacAft(func() fips140.Hash { return sha256.New() }),
+		"OneStepNoCounter/HMAC-SHA2-384":     cmdOneStepNoCounterHmacAft(func() fips140.Hash { return sha512.New384() }),
+		"OneStepNoCounter/HMAC-SHA2-512":     cmdOneStepNoCounterHmacAft(func() fips140.Hash { return sha512.New() }),
+		"OneStepNoCounter/HMAC-SHA2-512/224": cmdOneStepNoCounterHmacAft(func() fips140.Hash { return sha512.New512_224() }),
+		"OneStepNoCounter/HMAC-SHA2-512/256": cmdOneStepNoCounterHmacAft(func() fips140.Hash { return sha512.New512_256() }),
+		"OneStepNoCounter/HMAC-SHA3-224":     cmdOneStepNoCounterHmacAft(func() fips140.Hash { return sha3.New224() }),
+		"OneStepNoCounter/HMAC-SHA3-256":     cmdOneStepNoCounterHmacAft(func() fips140.Hash { return sha3.New256() }),
+		"OneStepNoCounter/HMAC-SHA3-384":     cmdOneStepNoCounterHmacAft(func() fips140.Hash { return sha3.New384() }),
+		"OneStepNoCounter/HMAC-SHA3-512":     cmdOneStepNoCounterHmacAft(func() fips140.Hash { return sha3.New512() }),
 	}
 )
 
@@ -1822,14 +1835,45 @@ func getRSAKey(bits int) (*rsa.PrivateKey, error) {
 	return key, nil
 }
 
+func cmdOneStepNoCounterHmacAft(h func() fips140.Hash) command {
+	return command{
+		requiredArgs: 4, // key, info, salt, outBytes
+		handler: func(args [][]byte) ([][]byte, error) {
+			key := args[0]
+			info := args[1]
+			salt := args[2]
+			outBytes := binary.LittleEndian.Uint32(args[3])
+
+			mac := hmac.New(h, salt)
+			mac.Size()
+
+			if outBytes != uint32(mac.Size()) {
+				return nil, fmt.Errorf("invalid output length: got %d, want %d", outBytes, mac.Size())
+			}
+
+			data := make([]byte, 0, len(key)+len(info))
+			data = append(data, key...)
+			data = append(data, info...)
+
+			mac.Write(data)
+			out := mac.Sum(nil)
+
+			return [][]byte{out}, nil
+		},
+	}
+}
+
 func TestACVP(t *testing.T) {
 	testenv.SkipIfShortAndSlow(t)
 
 	const (
-		bsslModule    = "boringssl.googlesource.com/boringssl.git"
-		bsslVersion   = "v0.0.0-20250123161947-ba24bde161f7"
+		// TODO(@cpu): restore once upstream supports KDA OneStepNoCounter.
+		// bsslModule    = "boringssl.googlesource.com/boringssl.git"
+		// bsslVersion   = "v0.0.0-20250123161947-ba24bde161f7"
+		bsslModule    = "github.com/cpu/acvptool"
+		bsslVersion   = "v0.0.0-20250117175052-2596732ccd9b"
 		goAcvpModule  = "github.com/cpu/go-acvp"
-		goAcvpVersion = "v0.0.0-20250110181646-e47fea3b5d7d"
+		goAcvpVersion = "v0.0.0-20250117180340-0406d83a4b0d"
 	)
 
 	// In crypto/tls/bogo_shim_test.go the test is skipped if run on a builder with runtime.GOOS == "windows"
@@ -1852,7 +1896,9 @@ func TestACVP(t *testing.T) {
 	cmd := testenv.Command(t, goTool,
 		"build",
 		"-o", toolPath,
-		"./util/fipstools/acvp/acvptool")
+		// TODO(@cpu): restore once using upstream acvptool
+		// "./util/fipstools/acvp/acvptool",
+		".")
 	cmd.Dir = bsslDir
 	out := &strings.Builder{}
 	cmd.Stderr = out
@@ -1876,7 +1922,9 @@ func TestACVP(t *testing.T) {
 	// so we run the command from that dir.
 	args := []string{
 		"run",
-		filepath.Join(bsslDir, "util/fipstools/acvp/acvptool/test/check_expected.go"),
+		// TODO(@cpu): restore once using upstream acvptool
+		//filepath.Join(bsslDir, "util/fipstools/acvp/acvptool/test/check_expected.go"),
+		filepath.Join(bsslDir, "test/check_expected.go"),
 		"-tool",
 		toolPath,
 		// Note: module prefix must match Wrapper value in acvp_test.config.json.
