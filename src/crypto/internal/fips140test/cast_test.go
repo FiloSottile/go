@@ -127,6 +127,7 @@ UjmopwKBgAqB2KYYMUqAOvYcBnEfLDmyZv9BTVNHbR2lKkMYqv5LlvDaBxVfilE0
 }
 
 func TestCASTFailures(t *testing.T) {
+	moduleStatus(t)
 	testenv.MustHaveExec(t)
 
 	allCASTs := findAllCASTs(t)
@@ -136,19 +137,23 @@ func TestCASTFailures(t *testing.T) {
 
 	for name := range allCASTs {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+			if testing.Short() {
+				t.Parallel()
+			}
+			t.Logf("CAST/PCT succeeded: %s", name)
+			t.Logf("Testing CAST/PCT failure...")
 			cmd := testenv.Command(t, testenv.Executable(t), "-test.run=TestConditionals", "-test.v")
 			cmd = testenv.CleanCmdEnv(cmd)
 			cmd.Env = append(cmd.Env, fmt.Sprintf("GODEBUG=failfipscast=%s,fips140=on", name))
 			out, err := cmd.CombinedOutput()
+			t.Logf("%s", out)
 			if err == nil {
-				t.Error(err)
-			} else {
-				t.Logf("CAST/PCT %s failed and caused the program to exit or the test to fail", name)
-				t.Logf("%s", out)
+				t.Fatal("Test did not fail as expected")
 			}
 			if strings.Contains(string(out), "completed successfully") {
 				t.Errorf("CAST/PCT %s failure did not stop the program", name)
+			} else {
+				t.Logf("CAST/PCT %s failed as expected and caused the program to exit", name)
 			}
 		})
 	}
